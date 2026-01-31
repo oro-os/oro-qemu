@@ -180,6 +180,51 @@ enum {
      */
     ORO_KDBEVT_AA64_REG_DUMP4 = 0x2005,
 
+    /* AArch64 TTBR0_EL1 update event
+     * NOTE: Emitted BEFORE CPU validation - the update may be rejected
+     * reg[1] = old TTBR0_EL1 value
+     * reg[2] = new (requested) TTBR0_EL1 value
+     * reg[3] = current exception level
+     * reg[4-7] = unused
+     */
+    ORO_KDBEVT_AA64_TTBR0_EL1_UPDATE = 0x2006,
+
+    /* AArch64 TTBR1_EL1 update event
+     * NOTE: Emitted BEFORE CPU validation - the update may be rejected
+     * reg[1] = old TTBR1_EL1 value
+     * reg[2] = new (requested) TTBR1_EL1 value
+     * reg[3] = current exception level
+     * reg[4-7] = unused
+     */
+    ORO_KDBEVT_AA64_TTBR1_EL1_UPDATE = 0x2007,
+
+    /* AArch64 TTBR0_EL2 update event
+     * NOTE: Emitted BEFORE CPU validation - the update may be rejected
+     * reg[1] = old TTBR0_EL2 value
+     * reg[2] = new (requested) TTBR0_EL2 value
+     * reg[3] = current exception level
+     * reg[4-7] = unused
+     */
+    ORO_KDBEVT_AA64_TTBR0_EL2_UPDATE = 0x2008,
+
+    /* AArch64 TTBR1_EL2 update event
+     * NOTE: Emitted BEFORE CPU validation - the update may be rejected
+     * reg[1] = old TTBR1_EL2 value
+     * reg[2] = new (requested) TTBR1_EL2 value
+     * reg[3] = current exception level
+     * reg[4-7] = unused
+     */
+    ORO_KDBEVT_AA64_TTBR1_EL2_UPDATE = 0x2009,
+
+    /* AArch64 TTBR0_EL3 update event
+     * NOTE: Emitted BEFORE CPU validation - the update may be rejected
+     * reg[1] = old TTBR0_EL3 value
+     * reg[2] = new (requested) TTBR0_EL3 value
+     * reg[3] = current exception level
+     * reg[4-7] = unused
+     */
+    ORO_KDBEVT_AA64_TTBR0_EL3_UPDATE = 0x200A,
+
     /* RISC-V Exception event
      * reg[1] = cause (exception code)
      * reg[2] = tval (trap value - badaddr or illegal instruction)

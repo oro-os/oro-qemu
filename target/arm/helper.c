@@ -2782,6 +2782,37 @@ static void vmsa_tcr_el12_write(CPUARMState *env, const ARMCPRegInfo *ri,
 static void vmsa_ttbr_write(CPUARMState *env, const ARMCPRegInfo *ri,
                             uint64_t value)
 {
+#ifndef CONFIG_USER_ONLY
+    /* Emit oro_kdbg TTBR update event */
+    uint64_t old_value = raw_read(env, ri);
+    if (old_value != value) {
+        uint64_t regs[7];
+        uint32_t event_id;
+        uint32_t el = arm_current_el(env);
+        
+        /* Determine which TTBR is being written by checking fieldoffset */
+        if (ri->bank_fieldoffsets[0] == offsetof(CPUARMState, cp15.ttbr0_s)) {
+            /* TTBR0_EL1 */
+            event_id = ORO_KDBEVT_AA64_TTBR0_EL1_UPDATE;
+        } else if (ri->bank_fieldoffsets[0] == offsetof(CPUARMState, cp15.ttbr1_s)) {
+            /* TTBR1_EL1 */
+            event_id = ORO_KDBEVT_AA64_TTBR1_EL1_UPDATE;
+        } else {
+            /* Unknown TTBR, skip event */
+            goto skip_event;
+        }
+        
+        regs[0] = old_value;
+        regs[1] = value;
+        regs[2] = el;
+        regs[3] = 0;
+        regs[4] = 0;
+        regs[5] = 0;
+        regs[6] = 0;
+        oro_kdbg_emit_global(event_id, regs);
+    }
+skip_event:
+#endif
     /* If the ASID changes (with a 64-bit write), we must flush the TLB.  */
     if (cpreg_field_type(ri) == MO_64 &&
         extract64(raw_read(env, ri) ^ value, 48, 16) != 0) {
@@ -2794,6 +2825,37 @@ static void vmsa_ttbr_write(CPUARMState *env, const ARMCPRegInfo *ri,
 static void vmsa_tcr_ttbr_el2_write(CPUARMState *env, const ARMCPRegInfo *ri,
                                     uint64_t value)
 {
+#ifndef CONFIG_USER_ONLY
+    /* Emit oro_kdbg TTBR update event */
+    uint64_t old_value = raw_read(env, ri);
+    if (old_value != value) {
+        uint64_t regs[7];
+        uint32_t event_id;
+        uint32_t el = arm_current_el(env);
+        
+        /* Determine which TTBR is being written by checking fieldoffset */
+        if (ri->fieldoffset == offsetof(CPUARMState, cp15.ttbr0_el[2])) {
+            /* TTBR0_EL2 */
+            event_id = ORO_KDBEVT_AA64_TTBR0_EL2_UPDATE;
+        } else if (ri->fieldoffset == offsetof(CPUARMState, cp15.ttbr1_el[2])) {
+            /* TTBR1_EL2 */
+            event_id = ORO_KDBEVT_AA64_TTBR1_EL2_UPDATE;
+        } else {
+            /* Unknown TTBR, skip event */
+            goto skip_event;
+        }
+        
+        regs[0] = old_value;
+        regs[1] = value;
+        regs[2] = el;
+        regs[3] = 0;
+        regs[4] = 0;
+        regs[5] = 0;
+        regs[6] = 0;
+        oro_kdbg_emit_global(event_id, regs);
+    }
+skip_event:
+#endif
     /*
      * If we are running with E2&0 regime, then an ASID is active.
      * Flush if that might be changing.  Note we're not checking
@@ -2804,6 +2866,29 @@ static void vmsa_tcr_ttbr_el2_write(CPUARMState *env, const ARMCPRegInfo *ri,
         (arm_hcr_el2_eff(env) & HCR_E2H)) {
         tlb_flush_by_mmuidx(env_cpu(env), alle2_tlbmask());
     }
+    raw_write(env, ri, value);
+}
+
+static void vmsa_ttbr_el3_write(CPUARMState *env, const ARMCPRegInfo *ri,
+                                uint64_t value)
+{
+#ifndef CONFIG_USER_ONLY
+    /* Emit oro_kdbg TTBR0_EL3 update event */
+    uint64_t old_value = raw_read(env, ri);
+    if (old_value != value) {
+        uint64_t regs[7];
+        uint32_t el = arm_current_el(env);
+        
+        regs[0] = old_value;
+        regs[1] = value;
+        regs[2] = el;
+        regs[3] = 0;
+        regs[4] = 0;
+        regs[5] = 0;
+        regs[6] = 0;
+        oro_kdbg_emit_global(ORO_KDBEVT_AA64_TTBR0_EL3_UPDATE, regs);
+    }
+#endif
     raw_write(env, ri, value);
 }
 
@@ -4447,6 +4532,7 @@ static const ARMCPRegInfo el3_cp_reginfo[] = {
     { .name = "TTBR0_EL3", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 6, .crn = 2, .crm = 0, .opc2 = 0,
       .access = PL3_RW, .resetvalue = 0,
+      .writefn = vmsa_ttbr_el3_write, .raw_writefn = raw_write,
       .fieldoffset = offsetof(CPUARMState, cp15.ttbr0_el[3]) },
     { .name = "TCR_EL3", .state = ARM_CP_STATE_AA64,
       .opc0 = 3, .opc1 = 6, .crn = 2, .crm = 0, .opc2 = 2,

@@ -30,15 +30,20 @@ def decode_packet(data):
     reg0 = struct.unpack('<Q', data[0:8])[0]
     info = decode_reg0(reg0)
     
+    # Calculate expected packet size from bitmask
+    num_additional_regs = bin(info['bitmask']).count('1')
+    expected_size = 8 + (num_additional_regs * 8)
+    
+    # Check if we have enough data for the complete packet
+    if len(data) < expected_size:
+        return None  # Not enough data yet, wait for more
+    
     # Decode additional registers based on bitmask
     registers = {}
     data_offset = 8
     
     for i in range(7):
         if info['bitmask'] & (1 << i):
-            if data_offset + 8 > len(data):
-                print(f"Warning: Truncated packet, expected register {i+1}", file=sys.stderr)
-                break
             reg_value = struct.unpack('<Q', data[data_offset:data_offset+8])[0]
             registers[i + 1] = reg_value
             data_offset += 8
@@ -48,7 +53,7 @@ def decode_packet(data):
         'cpu_index': info['cpu_index'],
         'command_id': info['command_id'],
         'registers': registers,
-        'packet_size': data_offset
+        'packet_size': expected_size
     }
 
 def main():
@@ -121,3 +126,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
