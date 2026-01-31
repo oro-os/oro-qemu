@@ -31,6 +31,9 @@
 #include "qapi/error.h"
 #include "tcg/insn-start-words.h"
 #include "internals.h"
+#ifndef CONFIG_USER_ONLY
+#include "hw/char/oro_kdbg.h"
+#endif
 
 /* CSR function table public API */
 void riscv_get_csr_ops(int csrno, riscv_csr_operations *ops)
@@ -4315,7 +4318,27 @@ static RISCVException write_satp(CPURISCVState *env, int csrno,
         return RISCV_EXCP_NONE;
     }
 
+#ifndef CONFIG_USER_ONLY
+    /* Emit oro_kdbg satp update event */
+    target_ulong old_satp = env->satp;
+    target_ulong new_satp = legalize_xatp(env, old_satp, val);
+    
+    if (old_satp != new_satp) {
+        uint64_t regs[7];
+        regs[0] = old_satp;
+        regs[1] = new_satp;
+        regs[2] = env->priv;  /* Current privilege level */
+        regs[3] = 0;
+        regs[4] = 0;
+        regs[5] = 0;
+        regs[6] = 0;
+        oro_kdbg_emit_global(ORO_KDBEVT_RV64_SATP_UPDATE, regs);
+    }
+    
+    env->satp = new_satp;
+#else
     env->satp = legalize_xatp(env, env->satp, val);
+#endif
     return RISCV_EXCP_NONE;
 }
 

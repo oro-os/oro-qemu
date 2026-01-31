@@ -290,6 +290,15 @@ enum {
      * reg[7] = unused
      */
     ORO_KDBEVT_RV64_REG_DUMP4 = 0x3005,
+
+    /* RISC-V satp (Supervisor Address Translation and Protection) update event
+     * NOTE: Emitted BEFORE CPU validation - the update may be rejected
+     * reg[1] = old satp value
+     * reg[2] = new (requested) satp value
+     * reg[3] = current privilege level (M=3, S=1, U=0)
+     * reg[4-7] = unused
+     */
+    ORO_KDBEVT_RV64_SATP_UPDATE = 0x3006,
 };
 
 struct OroKdbgState {
