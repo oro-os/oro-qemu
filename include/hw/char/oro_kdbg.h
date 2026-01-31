@@ -45,4 +45,25 @@ void oro_kdbg_send_event(bool is_qemu_event, uint8_t cpu_index,
                          uint64_t command_id, const uint64_t regs[7],
                          CharFrontend *chr);
 
+/*
+ * Register the global oro_kdbg chardev
+ * Called automatically by oro_kdbg_create()
+ * 
+ * @chr: CharFrontend pointer to store for global access
+ */
+void oro_kdbg_register_global(CharFrontend *chr);
+
+/*
+ * Emit an event from QEMU using the global chardev
+ * Thread-safe, can be called from any QEMU thread
+ * No-op if global chardev not registered
+ * 
+ * @command_id: 48-bit command ID (must have bits 63-48 clear)
+ * @regs: Array of 7 register values, or NULL for all zeros
+ * 
+ * CPU index automatically determined from current_cpu if available
+ * Always sets is_qemu_event=true (bit 63)
+ */
+void oro_kdbg_emit_global(uint64_t command_id, const uint64_t regs[7]);
+
 #endif

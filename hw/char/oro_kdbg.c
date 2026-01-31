@@ -21,9 +21,51 @@
 #include "chardev/char-serial.h"
 #include "qemu/log.h"
 #include "qemu/module.h"
+#include "qemu/lockable.h"
 #include "trace.h"
 
 #define ORO_KDBG_NO_THREAD_ID 0xFF
+
+/* Global chardev for oro_kdbg, protected by mutex */
+static QemuMutex oro_kdbg_global_lock;
+static CharFrontend *oro_kdbg_global_chr = NULL;
+
+static void __attribute__((__constructor__)) oro_kdbg_mutex_init(void)
+{
+    qemu_mutex_init(&oro_kdbg_global_lock);
+}
+
+void oro_kdbg_register_global(CharFrontend *chr)
+{
+    QEMU_LOCK_GUARD(&oro_kdbg_global_lock);
+    oro_kdbg_global_chr = chr;
+}
+
+void oro_kdbg_emit_global(uint64_t command_id, const uint64_t regs[7])
+{
+    uint8_t cpu_index = ORO_KDBG_NO_THREAD_ID;
+    uint64_t zero_regs[7] = {0};
+    
+    QEMU_LOCK_GUARD(&oro_kdbg_global_lock);
+    
+    if (!oro_kdbg_global_chr) {
+        return;  /* Not registered yet */
+    }
+    
+    /* Get CPU index from current executing CPU */
+    if (current_cpu) {
+        uint32_t idx = current_cpu->cpu_index;
+        if (idx > 255) {
+            cpu_index = 255;
+        } else {
+            cpu_index = (uint8_t)idx;
+        }
+    }
+    
+    oro_kdbg_send_event(true, cpu_index, command_id,
+                       regs ? regs : zero_regs,
+                       oro_kdbg_global_chr);
+}
 
 /*
  * Encode and send an oro_kdbg event packet
@@ -73,12 +115,17 @@ DeviceState *oro_kdbg_create(hwaddr addr, Chardev *chr)
 {
     DeviceState *dev;
     SysBusDevice *s;
+    OroKdbgState *state;
 
     dev = qdev_new("oro_kdbg");
     s = SYS_BUS_DEVICE(dev);
     qdev_prop_set_chr(dev, "chardev", chr);
     sysbus_realize_and_unref(s, &error_fatal);
     sysbus_mmio_map(s, 0, addr);
+
+    /* Register global chardev for VM-wide access */
+    state = ORO_KDBG(dev);
+    oro_kdbg_register_global(&state->chr);
 
     return dev;
 }
