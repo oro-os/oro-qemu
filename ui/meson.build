@@ -11,6 +11,7 @@ system_ss.add(files(
   'input.c',
   'kbd-state.c',
   'keymaps.c',
+  'orovideo.c',
   'qemu-pixman.c',
   'ui-hmp-cmds.c',
   'ui-qmp-cmds.c',

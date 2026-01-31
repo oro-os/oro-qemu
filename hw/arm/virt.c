@@ -91,6 +91,7 @@
 #include "hw/virtio/virtio-iommu.h"
 #include "hw/char/pl011.h"
 #include "hw/char/oro_kdbg.h"
+#include "ui/orovideo.h"
 #include "hw/cxl/cxl.h"
 #include "hw/cxl/cxl_host.h"
 #include "qemu/guest-random.h"
@@ -2501,6 +2502,9 @@ static void machvirt_init(MachineState *machine)
     }
 
     oro_kdbg_create(vms->memmap[VIRT_ORO_KDBG].base, qemu_chr_find("orokdbg"));
+
+    /* Initialize orovideo display streaming if chardev exists */
+    orovideo_display_init(qemu_chr_find("orovideo"));
 
     if (vms->secure) {
         create_secure_ram(vms, secure_sysmem, secure_tag_sysmem);

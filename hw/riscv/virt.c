@@ -56,6 +56,7 @@
 #include "hw/display/ramfb.h"
 #include "hw/acpi/aml-build.h"
 #include "hw/char/oro_kdbg.h"
+#include "ui/orovideo.h"
 #include "qapi/qapi-visit-common.h"
 #include "hw/virtio/virtio-iommu.h"
 #include "hw/uefi/var-service-api.h"
@@ -1709,6 +1710,9 @@ static void virt_machine_init(MachineState *machine)
         serial_hd(0), DEVICE_LITTLE_ENDIAN);
 
     oro_kdbg_create(s->memmap[VIRT_ORO_KDBG].base, qemu_chr_find("orokdbg"));
+
+    /* Initialize orovideo display streaming if chardev exists */
+    orovideo_display_init(qemu_chr_find("orovideo"));
 
     sysbus_create_simple("goldfish_rtc", s->memmap[VIRT_RTC].base,
         qdev_get_gpio_in(mmio_irqchip, RTC_IRQ));
