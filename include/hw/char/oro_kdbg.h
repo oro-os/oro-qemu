@@ -89,6 +89,72 @@ enum {
      * reg[7] = unused
      */
     ORO_KDBEVT_X86_REG_DUMP4 = 0x1005,
+
+    /* AArch64 Exception event
+     * reg[1] = exception index (QEMU internal)
+     * reg[2] = ESR_EL (Exception Syndrome Register)
+     * reg[3] = FAR_EL (Fault Address Register)
+     * reg[4] = PC at time of exception
+     * reg[5] = PSTATE at time of exception
+     * reg[6] = current exception level (0-3)
+     * reg[7] = SP at time of exception
+     */
+    ORO_KDBEVT_AA64_EXCEPTION = 0x2000,
+
+    /* AArch64 Register dump 0: X0-X6
+     * reg[1] = X0
+     * reg[2] = X1
+     * reg[3] = X2
+     * reg[4] = X3
+     * reg[5] = X4
+     * reg[6] = X5
+     * reg[7] = X6
+     */
+    ORO_KDBEVT_AA64_REG_DUMP0 = 0x2001,
+
+    /* AArch64 Register dump 1: X7-X13
+     * reg[1] = X7
+     * reg[2] = X8
+     * reg[3] = X9
+     * reg[4] = X10
+     * reg[5] = X11
+     * reg[6] = X12
+     * reg[7] = X13
+     */
+    ORO_KDBEVT_AA64_REG_DUMP1 = 0x2002,
+
+    /* AArch64 Register dump 2: X14-X20
+     * reg[1] = X14
+     * reg[2] = X15
+     * reg[3] = X16
+     * reg[4] = X17
+     * reg[5] = X18
+     * reg[6] = X19
+     * reg[7] = X20
+     */
+    ORO_KDBEVT_AA64_REG_DUMP2 = 0x2003,
+
+    /* AArch64 Register dump 3: X21-X27
+     * reg[1] = X21
+     * reg[2] = X22
+     * reg[3] = X23
+     * reg[4] = X24
+     * reg[5] = X25
+     * reg[6] = X26
+     * reg[7] = X27
+     */
+    ORO_KDBEVT_AA64_REG_DUMP3 = 0x2004,
+
+    /* AArch64 Register dump 4: X28-X30, SP
+     * reg[1] = X28
+     * reg[2] = X29 (FP - Frame Pointer)
+     * reg[3] = X30 (LR - Link Register)
+     * reg[4] = unused
+     * reg[5] = unused
+     * reg[6] = unused
+     * reg[7] = unused
+     */
+    ORO_KDBEVT_AA64_REG_DUMP4 = 0x2005,
 };
 
 struct OroKdbgState {

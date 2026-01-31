@@ -33,6 +33,7 @@
 #include "semihosting/common-semi.h"
 #endif
 #include "cpregs.h"
+#include "hw/char/oro_kdbg.h"
 #include "target/arm/gtimer.h"
 #include "qemu/plugin.h"
 
@@ -9383,6 +9384,133 @@ static void arm_cpu_do_interrupt_aarch64(CPUState *cs)
     default:
         cpu_abort(cs, "Unhandled exception 0x%x\n", cs->exception_index);
     }
+
+#if !defined(CONFIG_USER_ONLY)
+    /* Emit oro_kdbg exception event for synchronous exceptions only */
+    switch (cs->exception_index) {
+    case EXCP_UDEF:
+    case EXCP_SWI:
+    case EXCP_PREFETCH_ABORT:
+    case EXCP_DATA_ABORT:
+    case EXCP_BKPT:
+    case EXCP_EXCEPTION_EXIT:
+    case EXCP_HVC:
+    case EXCP_HYP_TRAP:
+    case EXCP_SMC:
+    case EXCP_GPC:
+    case EXCP_SEMIHOST:
+    case EXCP_DIVBYZERO:
+        /* These are synchronous exceptions - emit debug events */
+        {
+            uint64_t regs[7];
+            uint64_t saved_pstate = pstate_read(env);
+            
+            /* Exception event */
+            regs[0] = cs->exception_index;
+            regs[1] = env->cp15.esr_el[new_el];
+            regs[2] = env->cp15.far_el[new_el];
+            regs[3] = env->pc;
+            regs[4] = saved_pstate;
+            regs[5] = cur_el;
+            regs[6] = is_a64(env) ? env->xregs[31] : env->regs[13];
+            oro_kdbg_emit_global(ORO_KDBEVT_AA64_EXCEPTION, regs);
+            
+            /* REG_DUMP0: X0-X6 */
+            if (is_a64(env)) {
+                regs[0] = env->xregs[0];
+                regs[1] = env->xregs[1];
+                regs[2] = env->xregs[2];
+                regs[3] = env->xregs[3];
+                regs[4] = env->xregs[4];
+                regs[5] = env->xregs[5];
+                regs[6] = env->xregs[6];
+            } else {
+                /* AArch32 - R0-R6 */
+                regs[0] = env->regs[0];
+                regs[1] = env->regs[1];
+                regs[2] = env->regs[2];
+                regs[3] = env->regs[3];
+                regs[4] = env->regs[4];
+                regs[5] = env->regs[5];
+                regs[6] = env->regs[6];
+            }
+            oro_kdbg_emit_global(ORO_KDBEVT_AA64_REG_DUMP0, regs);
+            
+            /* REG_DUMP1: X7-X13 */
+            if (is_a64(env)) {
+                regs[0] = env->xregs[7];
+                regs[1] = env->xregs[8];
+                regs[2] = env->xregs[9];
+                regs[3] = env->xregs[10];
+                regs[4] = env->xregs[11];
+                regs[5] = env->xregs[12];
+                regs[6] = env->xregs[13];
+            } else {
+                regs[0] = env->regs[7];
+                regs[1] = env->regs[8];
+                regs[2] = env->regs[9];
+                regs[3] = env->regs[10];
+                regs[4] = env->regs[11];
+                regs[5] = env->regs[12];
+                regs[6] = env->regs[13]; /* SP in AArch32 */
+            }
+            oro_kdbg_emit_global(ORO_KDBEVT_AA64_REG_DUMP1, regs);
+            
+            /* REG_DUMP2: X14-X20 */
+            if (is_a64(env)) {
+                regs[0] = env->xregs[14];
+                regs[1] = env->xregs[15];
+                regs[2] = env->xregs[16];
+                regs[3] = env->xregs[17];
+                regs[4] = env->xregs[18];
+                regs[5] = env->xregs[19];
+                regs[6] = env->xregs[20];
+            } else {
+                regs[0] = env->regs[14]; /* LR in AArch32 */
+                regs[1] = env->regs[15]; /* PC in AArch32 */
+                regs[2] = 0;
+                regs[3] = 0;
+                regs[4] = 0;
+                regs[5] = 0;
+                regs[6] = 0;
+            }
+            oro_kdbg_emit_global(ORO_KDBEVT_AA64_REG_DUMP2, regs);
+            
+            /* REG_DUMP3: X21-X27 (AArch64 only) */
+            if (is_a64(env)) {
+                regs[0] = env->xregs[21];
+                regs[1] = env->xregs[22];
+                regs[2] = env->xregs[23];
+                regs[3] = env->xregs[24];
+                regs[4] = env->xregs[25];
+                regs[5] = env->xregs[26];
+                regs[6] = env->xregs[27];
+                oro_kdbg_emit_global(ORO_KDBEVT_AA64_REG_DUMP3, regs);
+                
+                /* REG_DUMP4: X28-X30 (FP, LR) */
+                regs[0] = env->xregs[28];
+                regs[1] = env->xregs[29]; /* FP */
+                regs[2] = env->xregs[30]; /* LR */
+                regs[3] = 0;
+                regs[4] = 0;
+                regs[5] = 0;
+                regs[6] = 0;
+                oro_kdbg_emit_global(ORO_KDBEVT_AA64_REG_DUMP4, regs);
+            }
+        }
+        break;
+    case EXCP_IRQ:
+    case EXCP_FIQ:
+    case EXCP_VIRQ:
+    case EXCP_VFIQ:
+    case EXCP_VSERR:
+    case EXCP_VFNMI:
+    case EXCP_NMI:
+    case EXCP_VINMI:
+        /* Hardware interrupts - skip debug events */
+        break;
+    }
+#endif
 
     if (is_a64(env)) {
         old_mode = pstate_read(env);

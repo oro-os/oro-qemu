@@ -53,38 +53,71 @@ def decode_packet(data):
 
 def main():
     if len(sys.argv) > 1:
-        # Read from file
+        # Read from file (buffered, all at once)
         with open(sys.argv[1], 'rb') as f:
             data = f.read()
+        
+        offset = 0
+        packet_num = 0
+        
+        while offset < len(data):
+            remaining = data[offset:]
+            if len(remaining) < 8:
+                print(f"Warning: Trailing {len(remaining)} bytes at end of stream", file=sys.stderr)
+                break
+            
+            packet = decode_packet(remaining)
+            if not packet:
+                break
+            
+            packet_num += 1
+            print(f"\n=== Packet {packet_num} ===")
+            print(f"Source:      {packet['source']}")
+            print(f"CPU Index:   {packet['cpu_index'] if packet['cpu_index'] is not None else 'N/A'}")
+            print(f"Command ID:  0x{packet['command_id']:012x}")
+            print(f"Registers:   {len(packet['registers'])}")
+            
+            for reg_num, reg_value in sorted(packet['registers'].items()):
+                print(f"  reg[{reg_num}] = 0x{reg_value:016x}")
+            
+            offset += packet['packet_size']
     else:
-        # Read from stdin
-        data = sys.stdin.buffer.read()
-    
-    offset = 0
-    packet_num = 0
-    
-    while offset < len(data):
-        # Try to decode packet
-        remaining = data[offset:]
-        if len(remaining) < 8:
-            print(f"Warning: Trailing {len(remaining)} bytes at end of stream", file=sys.stderr)
-            break
+        # Stream from stdin
+        buffer = b''
+        packet_num = 0
+        chunk_size = 4096
         
-        packet = decode_packet(remaining)
-        if not packet:
-            break
-        
-        packet_num += 1
-        print(f"\n=== Packet {packet_num} ===")
-        print(f"Source:      {packet['source']}")
-        print(f"CPU Index:   {packet['cpu_index'] if packet['cpu_index'] is not None else 'N/A'}")
-        print(f"Command ID:  0x{packet['command_id']:012x}")
-        print(f"Registers:   {len(packet['registers'])}")
-        
-        for reg_num, reg_value in sorted(packet['registers'].items()):
-            print(f"  reg[{reg_num}] = 0x{reg_value:016x}")
-        
-        offset += packet['packet_size']
+        while True:
+            chunk = sys.stdin.buffer.read(chunk_size)
+            if not chunk:
+                # EOF reached
+                if len(buffer) > 0:
+                    print(f"\nWarning: Trailing {len(buffer)} bytes at end of stream", file=sys.stderr)
+                break
+            
+            buffer += chunk
+            
+            # Process all complete packets in buffer
+            while len(buffer) >= 8:
+                packet = decode_packet(buffer)
+                if not packet:
+                    # Not enough data for complete packet yet
+                    break
+                
+                packet_num += 1
+                print(f"\n=== Packet {packet_num} ===")
+                print(f"Source:      {packet['source']}")
+                print(f"CPU Index:   {packet['cpu_index'] if packet['cpu_index'] is not None else 'N/A'}")
+                print(f"Command ID:  0x{packet['command_id']:012x}")
+                print(f"Registers:   {len(packet['registers'])}")
+                
+                for reg_num, reg_value in sorted(packet['registers'].items()):
+                    print(f"  reg[{reg_num}] = 0x{reg_value:016x}")
+                
+                sys.stdout.flush()  # Force output to appear immediately
+                
+                # Remove processed packet from buffer
+                buffer = buffer[packet['packet_size']:]
 
 if __name__ == '__main__':
     main()
