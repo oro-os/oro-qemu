@@ -24,6 +24,7 @@
 #include "exec/helper-proto.h"
 #include "helper-tcg.h"
 #include "qemu/plugin.h"
+#include "hw/char/oro_kdbg.h"
 
 G_NORETURN void helper_raise_interrupt(CPUX86State *env, int intno,
                                           int next_eip_addend)
@@ -100,6 +101,89 @@ void raise_interrupt2(CPUX86State *env, int intno,
         cpu_svm_check_intercept_param(env, SVM_EXIT_EXCP_BASE + intno,
                                       error_code, retaddr);
         intno = check_exception(env, intno, &error_code, retaddr);
+        
+#if !defined(CONFIG_USER_ONLY)
+        /* Emit oro_kdbg exception event and register dumps */
+        {
+            uint64_t regs[7];
+            int eflags = cpu_compute_eflags(env);
+            
+            /* Exception event */
+            regs[0] = intno;
+            regs[1] = error_code;
+            regs[2] = env->cr[2];  /* CR2 for page faults */
+            regs[3] = env->eip;
+            regs[4] = env->segs[R_CS].selector;
+            regs[5] = eflags;
+            regs[6] = env->hflags & HF_CPL_MASK;  /* CPL */
+            oro_kdbg_emit_global(ORO_KDBEVT_X86_EXCEPTION, regs);
+            
+            /* REG_DUMP0: General purpose registers */
+            regs[0] = env->regs[R_EAX];
+            regs[1] = env->regs[R_EBX];
+            regs[2] = env->regs[R_ECX];
+            regs[3] = env->regs[R_EDX];
+            regs[4] = env->regs[R_ESI];
+            regs[5] = env->regs[R_EDI];
+            regs[6] = env->regs[R_EBP];
+            oro_kdbg_emit_global(ORO_KDBEVT_X86_REG_DUMP0, regs);
+            
+            /* REG_DUMP1: RSP and R8-R13 */
+            regs[0] = env->regs[R_ESP];
+#ifdef TARGET_X86_64
+            regs[1] = env->regs[8];
+            regs[2] = env->regs[9];
+            regs[3] = env->regs[10];
+            regs[4] = env->regs[11];
+            regs[5] = env->regs[12];
+            regs[6] = env->regs[13];
+#else
+            regs[1] = 0;
+            regs[2] = 0;
+            regs[3] = 0;
+            regs[4] = 0;
+            regs[5] = 0;
+            regs[6] = 0;
+#endif
+            oro_kdbg_emit_global(ORO_KDBEVT_X86_REG_DUMP1, regs);
+            
+            /* REG_DUMP2: R14-R15 and segment selectors */
+#ifdef TARGET_X86_64
+            regs[0] = env->regs[14];
+            regs[1] = env->regs[15];
+#else
+            regs[0] = 0;
+            regs[1] = 0;
+#endif
+            regs[2] = env->segs[R_ES].selector;
+            regs[3] = env->segs[R_DS].selector;
+            regs[4] = env->segs[R_FS].selector;
+            regs[5] = env->segs[R_GS].selector;
+            regs[6] = env->segs[R_SS].selector;
+            oro_kdbg_emit_global(ORO_KDBEVT_X86_REG_DUMP2, regs);
+            
+            /* REG_DUMP3: Control registers */
+            regs[0] = env->cr[0];
+            regs[1] = env->cr[3];
+            regs[2] = env->cr[4];
+            /* CR8 is mapped to APIC TPR, skip for now */
+            regs[3] = 0;
+            regs[4] = env->efer;
+            regs[5] = 0;
+            regs[6] = 0;
+            oro_kdbg_emit_global(ORO_KDBEVT_X86_REG_DUMP3, regs);
+            
+            /* REG_DUMP4: Debug registers */
+            regs[0] = env->dr[0];
+            regs[1] = env->dr[1];
+            regs[2] = env->dr[2];
+            regs[3] = env->dr[3];
+            regs[4] = env->dr[6];
+            regs[5] = env->dr[7];
+            regs[6] = 0;
+            oro_kdbg_emit_global(ORO_KDBEVT_X86_REG_DUMP4, regs);
+        }
+#endif
     } else {
         cpu_svm_check_intercept_param(env, SVM_EXIT_SWINT, 0, retaddr);
     }

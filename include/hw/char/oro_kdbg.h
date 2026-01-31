@@ -22,6 +22,75 @@
 #define TYPE_ORO_KDBG "oro_kdbg"
 OBJECT_DECLARE_SIMPLE_TYPE(OroKdbgState, ORO_KDBG)
 
+/* Oro kernel debug event IDs */
+enum {
+    /* x86/x86-64 Exception event
+     * reg[1] = exception number (0-31)
+     * reg[2] = error code (if applicable)
+     * reg[3] = CR2 (page fault linear address)
+     * reg[4] = RIP/EIP
+     * reg[5] = CS
+     * reg[6] = RFLAGS/EFLAGS
+     * reg[7] = CPL (current privilege level)
+     */
+    ORO_KDBEVT_X86_EXCEPTION = 0x1000,
+
+    /* x86/x86-64 Register dump 0: General purpose registers
+     * reg[1] = RAX/EAX
+     * reg[2] = RBX/EBX
+     * reg[3] = RCX/ECX
+     * reg[4] = RDX/EDX
+     * reg[5] = RSI/ESI
+     * reg[6] = RDI/EDI
+     * reg[7] = RBP/EBP
+     */
+    ORO_KDBEVT_X86_REG_DUMP0 = 0x1001,
+
+    /* x86/x86-64 Register dump 1: Stack pointer and R8-R13 (64-bit only)
+     * reg[1] = RSP/ESP
+     * reg[2] = R8  (0 in 32-bit mode)
+     * reg[3] = R9  (0 in 32-bit mode)
+     * reg[4] = R10 (0 in 32-bit mode)
+     * reg[5] = R11 (0 in 32-bit mode)
+     * reg[6] = R12 (0 in 32-bit mode)
+     * reg[7] = R13 (0 in 32-bit mode)
+     */
+    ORO_KDBEVT_X86_REG_DUMP1 = 0x1002,
+
+    /* x86/x86-64 Register dump 2: R14-R15 and segment selectors (64-bit only)
+     * reg[1] = R14 (0 in 32-bit mode)
+     * reg[2] = R15 (0 in 32-bit mode)
+     * reg[3] = ES selector
+     * reg[4] = DS selector
+     * reg[5] = FS selector
+     * reg[6] = GS selector
+     * reg[7] = SS selector
+     */
+    ORO_KDBEVT_X86_REG_DUMP2 = 0x1003,
+
+    /* x86/x86-64 Register dump 3: Control registers
+     * reg[1] = CR0
+     * reg[2] = CR3
+     * reg[3] = CR4
+     * reg[4] = unused (CR8 is APIC TPR, complex to access)
+     * reg[5] = EFER (extended feature enable register)
+     * reg[6] = unused
+     * reg[7] = unused
+     */
+    ORO_KDBEVT_X86_REG_DUMP3 = 0x1004,
+
+    /* x86/x86-64 Register dump 4: Debug registers
+     * reg[1] = DR0
+     * reg[2] = DR1
+     * reg[3] = DR2
+     * reg[4] = DR3
+     * reg[5] = DR6
+     * reg[6] = DR7
+     * reg[7] = unused
+     */
+    ORO_KDBEVT_X86_REG_DUMP4 = 0x1005,
+};
+
 struct OroKdbgState {
     SysBusDevice parent_obj;
 
