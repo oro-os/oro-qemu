@@ -143,10 +143,8 @@ void cpu_x86_update_cr0(CPUX86State *env, uint32_t new_cr0)
 #ifndef CONFIG_USER_ONLY
     /* Emit oro_kdbg CR0 update event */
     uint64_t old_cr0 = env->cr[0];
-    if (old_cr0 != new_cr0) {
-        uint64_t regs[7] = { old_cr0, new_cr0, 0, 0, 0, 0, 0 };
-        oro_kdbg_emit_global(ORO_KDBEVT_X86_CR0_UPDATE, regs);
-    }
+    uint64_t regs[7] = { old_cr0, new_cr0, 0, 0, 0, 0, 0 };
+    oro_kdbg_emit_global(ORO_KDBEVT_X86_CR0_UPDATE, regs);
 #endif
 
     if ((new_cr0 & (CR0_PG_MASK | CR0_WP_MASK | CR0_PE_MASK)) !=
@@ -190,10 +188,8 @@ void cpu_x86_update_cr3(CPUX86State *env, target_ulong new_cr3)
 #ifndef CONFIG_USER_ONLY
     /* Emit oro_kdbg CR3 update event */
     uint64_t old_cr3 = env->cr[3];
-    if (old_cr3 != new_cr3) {
-        uint64_t regs[7] = { old_cr3, new_cr3, 0, 0, 0, 0, 0 };
-        oro_kdbg_emit_global(ORO_KDBEVT_X86_CR3_UPDATE, regs);
-    }
+    uint64_t regs[7] = { old_cr3, new_cr3, 0, 0, 0, 0, 0 };
+    oro_kdbg_emit_global(ORO_KDBEVT_X86_CR3_UPDATE, regs);
 #endif
 
     env->cr[3] = new_cr3;
@@ -215,10 +211,8 @@ void cpu_x86_update_cr4(CPUX86State *env, uint32_t new_cr4)
 #ifndef CONFIG_USER_ONLY
     /* Emit oro_kdbg CR4 update event */
     uint64_t old_cr4 = env->cr[4];
-    if (old_cr4 != new_cr4) {
-        uint64_t regs[7] = { old_cr4, new_cr4, 0, 0, 0, 0, 0 };
-        oro_kdbg_emit_global(ORO_KDBEVT_X86_CR4_UPDATE, regs);
-    }
+    uint64_t regs[7] = { old_cr4, new_cr4, 0, 0, 0, 0, 0 };
+    oro_kdbg_emit_global(ORO_KDBEVT_X86_CR4_UPDATE, regs);
 #endif
 
     if ((new_cr4 ^ env->cr[4]) &

@@ -4323,17 +4323,15 @@ static RISCVException write_satp(CPURISCVState *env, int csrno,
     target_ulong old_satp = env->satp;
     target_ulong new_satp = legalize_xatp(env, old_satp, val);
     
-    if (old_satp != new_satp) {
-        uint64_t regs[7];
-        regs[0] = old_satp;
-        regs[1] = new_satp;
-        regs[2] = env->priv;  /* Current privilege level */
-        regs[3] = 0;
-        regs[4] = 0;
-        regs[5] = 0;
-        regs[6] = 0;
-        oro_kdbg_emit_global(ORO_KDBEVT_RV64_SATP_UPDATE, regs);
-    }
+    uint64_t regs[7];
+    regs[0] = old_satp;
+    regs[1] = new_satp;
+    regs[2] = env->priv;  /* Current privilege level */
+    regs[3] = 0;
+    regs[4] = 0;
+    regs[5] = 0;
+    regs[6] = 0;
+    oro_kdbg_emit_global(ORO_KDBEVT_RV64_SATP_UPDATE, regs);
     
     env->satp = new_satp;
 #else
