@@ -4,6 +4,10 @@ config ESCC
 config HTIF
     bool
 
+config ORO_KDBG
+    bool
+    default y
+
 config PARALLEL
     bool
     default y
