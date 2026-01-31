@@ -155,6 +155,72 @@ enum {
      * reg[7] = unused
      */
     ORO_KDBEVT_AA64_REG_DUMP4 = 0x2005,
+
+    /* RISC-V Exception event
+     * reg[1] = cause (exception code)
+     * reg[2] = tval (trap value - badaddr or illegal instruction)
+     * reg[3] = PC at time of exception
+     * reg[4] = mstatus (machine status register)
+     * reg[5] = privilege level (M=3, S=1, U=0)
+     * reg[6] = virt_enabled (1 if virtualization active, 0 otherwise)
+     * reg[7] = tinst (transformed instruction for two-stage faults)
+     */
+    ORO_KDBEVT_RV64_EXCEPTION = 0x3000,
+
+    /* RISC-V Register dump 0: x0-x6
+     * reg[1] = x0 (always zero)
+     * reg[2] = x1 (ra - return address)
+     * reg[3] = x2 (sp - stack pointer)
+     * reg[4] = x3 (gp - global pointer)
+     * reg[5] = x4 (tp - thread pointer)
+     * reg[6] = x5 (t0 - temporary)
+     * reg[7] = x6 (t1 - temporary)
+     */
+    ORO_KDBEVT_RV64_REG_DUMP0 = 0x3001,
+
+    /* RISC-V Register dump 1: x7-x13
+     * reg[1] = x7 (t2)
+     * reg[2] = x8 (s0/fp - saved/frame pointer)
+     * reg[3] = x9 (s1)
+     * reg[4] = x10 (a0 - arg/return)
+     * reg[5] = x11 (a1 - arg/return)
+     * reg[6] = x12 (a2 - arg)
+     * reg[7] = x13 (a3 - arg)
+     */
+    ORO_KDBEVT_RV64_REG_DUMP1 = 0x3002,
+
+    /* RISC-V Register dump 2: x14-x20
+     * reg[1] = x14 (a4)
+     * reg[2] = x15 (a5)
+     * reg[3] = x16 (a6)
+     * reg[4] = x17 (a7)
+     * reg[5] = x18 (s2)
+     * reg[6] = x19 (s3)
+     * reg[7] = x20 (s4)
+     */
+    ORO_KDBEVT_RV64_REG_DUMP2 = 0x3003,
+
+    /* RISC-V Register dump 3: x21-x27
+     * reg[1] = x21 (s5)
+     * reg[2] = x22 (s6)
+     * reg[3] = x23 (s7)
+     * reg[4] = x24 (s8)
+     * reg[5] = x25 (s9)
+     * reg[6] = x26 (s10)
+     * reg[7] = x27 (s11)
+     */
+    ORO_KDBEVT_RV64_REG_DUMP3 = 0x3004,
+
+    /* RISC-V Register dump 4: x28-x31
+     * reg[1] = x28 (t3)
+     * reg[2] = x29 (t4)
+     * reg[3] = x30 (t5)
+     * reg[4] = x31 (t6)
+     * reg[5] = unused
+     * reg[6] = unused
+     * reg[7] = unused
+     */
+    ORO_KDBEVT_RV64_REG_DUMP4 = 0x3005,
 };
 
 struct OroKdbgState {

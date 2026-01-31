@@ -32,6 +32,7 @@
 #include "accel/tcg/cpu-ops.h"
 #include "trace.h"
 #include "semihosting/common-semi.h"
+#include "hw/char/oro_kdbg.h"
 #include "exec/icount.h"
 #include "cpu_bits.h"
 #include "debug.h"
@@ -2284,6 +2285,73 @@ void riscv_cpu_do_interrupt(CPUState *cs)
                   "epc:0x"TARGET_FMT_lx", tval:0x"TARGET_FMT_lx", desc=%s\n",
                   __func__, env->mhartid, async, cause, env->pc, tval,
                   riscv_cpu_get_trap_name(cause, async));
+
+#if !defined(CONFIG_USER_ONLY)
+    /* Emit oro_kdbg exception event for synchronous exceptions only */
+    if (!async) {
+        uint64_t regs[7];
+        
+        /* Exception event */
+        regs[0] = cause;
+        regs[1] = tval;
+        regs[2] = env->pc;
+        regs[3] = env->mstatus;
+        regs[4] = env->priv;
+        regs[5] = env->virt_enabled ? 1 : 0;
+        regs[6] = tinst;
+        oro_kdbg_emit_global(ORO_KDBEVT_RV64_EXCEPTION, regs);
+        
+        /* REG_DUMP0: x0-x6 */
+        regs[0] = env->gpr[0];  /* Always 0 */
+        regs[1] = env->gpr[1];  /* ra */
+        regs[2] = env->gpr[2];  /* sp */
+        regs[3] = env->gpr[3];  /* gp */
+        regs[4] = env->gpr[4];  /* tp */
+        regs[5] = env->gpr[5];  /* t0 */
+        regs[6] = env->gpr[6];  /* t1 */
+        oro_kdbg_emit_global(ORO_KDBEVT_RV64_REG_DUMP0, regs);
+        
+        /* REG_DUMP1: x7-x13 */
+        regs[0] = env->gpr[7];   /* t2 */
+        regs[1] = env->gpr[8];   /* s0/fp */
+        regs[2] = env->gpr[9];   /* s1 */
+        regs[3] = env->gpr[10];  /* a0 */
+        regs[4] = env->gpr[11];  /* a1 */
+        regs[5] = env->gpr[12];  /* a2 */
+        regs[6] = env->gpr[13];  /* a3 */
+        oro_kdbg_emit_global(ORO_KDBEVT_RV64_REG_DUMP1, regs);
+        
+        /* REG_DUMP2: x14-x20 */
+        regs[0] = env->gpr[14];  /* a4 */
+        regs[1] = env->gpr[15];  /* a5 */
+        regs[2] = env->gpr[16];  /* a6 */
+        regs[3] = env->gpr[17];  /* a7 */
+        regs[4] = env->gpr[18];  /* s2 */
+        regs[5] = env->gpr[19];  /* s3 */
+        regs[6] = env->gpr[20];  /* s4 */
+        oro_kdbg_emit_global(ORO_KDBEVT_RV64_REG_DUMP2, regs);
+        
+        /* REG_DUMP3: x21-x27 */
+        regs[0] = env->gpr[21];  /* s5 */
+        regs[1] = env->gpr[22];  /* s6 */
+        regs[2] = env->gpr[23];  /* s7 */
+        regs[3] = env->gpr[24];  /* s8 */
+        regs[4] = env->gpr[25];  /* s9 */
+        regs[5] = env->gpr[26];  /* s10 */
+        regs[6] = env->gpr[27];  /* s11 */
+        oro_kdbg_emit_global(ORO_KDBEVT_RV64_REG_DUMP3, regs);
+        
+        /* REG_DUMP4: x28-x31 */
+        regs[0] = env->gpr[28];  /* t3 */
+        regs[1] = env->gpr[29];  /* t4 */
+        regs[2] = env->gpr[30];  /* t5 */
+        regs[3] = env->gpr[31];  /* t6 */
+        regs[4] = 0;
+        regs[5] = 0;
+        regs[6] = 0;
+        oro_kdbg_emit_global(ORO_KDBEVT_RV64_REG_DUMP4, regs);
+    }
+#endif
 
     mode = env->priv <= PRV_S && cause < 64 &&
         (((deleg >> cause) & 1) || s_injected || vs_injected) ? PRV_S : PRV_M;
