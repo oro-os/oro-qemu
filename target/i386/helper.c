@@ -28,6 +28,7 @@
 #include "system/hw_accel.h"
 #include "system/memory.h"
 #include "monitor/monitor.h"
+#include "hw/char/oro_kdbg.h"
 #include "kvm/kvm_i386.h"
 #endif
 #include "qemu/log.h"
@@ -138,6 +139,16 @@ void cpu_x86_update_cr0(CPUX86State *env, uint32_t new_cr0)
     int pe_state;
 
     qemu_log_mask(CPU_LOG_MMU, "CR0 update: CR0=0x%08x\n", new_cr0);
+
+#ifndef CONFIG_USER_ONLY
+    /* Emit oro_kdbg CR0 update event */
+    uint64_t old_cr0 = env->cr[0];
+    if (old_cr0 != new_cr0) {
+        uint64_t regs[7] = { old_cr0, new_cr0, 0, 0, 0, 0, 0 };
+        oro_kdbg_emit_global(ORO_KDBEVT_X86_CR0_UPDATE, regs);
+    }
+#endif
+
     if ((new_cr0 & (CR0_PG_MASK | CR0_WP_MASK | CR0_PE_MASK)) !=
         (env->cr[0] & (CR0_PG_MASK | CR0_WP_MASK | CR0_PE_MASK))) {
         tlb_flush(CPU(cpu));
@@ -176,6 +187,15 @@ void cpu_x86_update_cr0(CPUX86State *env, uint32_t new_cr0)
    the PDPT */
 void cpu_x86_update_cr3(CPUX86State *env, target_ulong new_cr3)
 {
+#ifndef CONFIG_USER_ONLY
+    /* Emit oro_kdbg CR3 update event */
+    uint64_t old_cr3 = env->cr[3];
+    if (old_cr3 != new_cr3) {
+        uint64_t regs[7] = { old_cr3, new_cr3, 0, 0, 0, 0, 0 };
+        oro_kdbg_emit_global(ORO_KDBEVT_X86_CR3_UPDATE, regs);
+    }
+#endif
+
     env->cr[3] = new_cr3;
     if (env->cr[0] & CR0_PG_MASK) {
         qemu_log_mask(CPU_LOG_MMU,
@@ -191,6 +211,16 @@ void cpu_x86_update_cr4(CPUX86State *env, uint32_t new_cr4)
 #if defined(DEBUG_MMU)
     printf("CR4 update: %08x -> %08x\n", (uint32_t)env->cr[4], new_cr4);
 #endif
+
+#ifndef CONFIG_USER_ONLY
+    /* Emit oro_kdbg CR4 update event */
+    uint64_t old_cr4 = env->cr[4];
+    if (old_cr4 != new_cr4) {
+        uint64_t regs[7] = { old_cr4, new_cr4, 0, 0, 0, 0, 0 };
+        oro_kdbg_emit_global(ORO_KDBEVT_X86_CR4_UPDATE, regs);
+    }
+#endif
+
     if ((new_cr4 ^ env->cr[4]) &
         (CR4_PGE_MASK | CR4_PAE_MASK | CR4_PSE_MASK |
          CR4_SMEP_MASK | CR4_SMAP_MASK | CR4_LA57_MASK)) {

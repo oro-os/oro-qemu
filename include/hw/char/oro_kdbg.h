@@ -90,6 +90,30 @@ enum {
      */
     ORO_KDBEVT_X86_REG_DUMP4 = 0x1005,
 
+    /* x86/x86-64 CR0 update event
+     * NOTE: Emitted BEFORE CPU validation - the update may be rejected
+     * reg[1] = old CR0 value
+     * reg[2] = new (requested) CR0 value
+     * reg[3-7] = unused
+     */
+    ORO_KDBEVT_X86_CR0_UPDATE = 0x1006,
+
+    /* x86/x86-64 CR3 update event
+     * NOTE: Emitted BEFORE CPU validation - the update may be rejected
+     * reg[1] = old CR3 value
+     * reg[2] = new (requested) CR3 value
+     * reg[3-7] = unused
+     */
+    ORO_KDBEVT_X86_CR3_UPDATE = 0x1007,
+
+    /* x86/x86-64 CR4 update event
+     * NOTE: Emitted BEFORE CPU validation - the update may be rejected
+     * reg[1] = old CR4 value
+     * reg[2] = new (requested) CR4 value
+     * reg[3-7] = unused
+     */
+    ORO_KDBEVT_X86_CR4_UPDATE = 0x1008,
+
     /* AArch64 Exception event
      * reg[1] = exception index (QEMU internal)
      * reg[2] = ESR_EL (Exception Syndrome Register)
