@@ -32,5 +32,17 @@ struct OroKdbgState {
 
 DeviceState *oro_kdbg_create(hwaddr addr, Chardev *chr);
 
-#endif
+/*
+ * Send an oro_kdbg event packet from QEMU
+ * 
+ * @is_qemu_event: true for QEMU-generated event, false for kernel event
+ * @cpu_index: CPU core index (0-254) or 0xFF for no thread
+ * @command_id: 48-bit command ID (must have bits 63-48 clear)
+ * @regs: Array of 7 register values (regs[1-7])
+ * @chr: Character frontend to send to
+ */
+void oro_kdbg_send_event(bool is_qemu_event, uint8_t cpu_index,
+                         uint64_t command_id, const uint64_t regs[7],
+                         CharFrontend *chr);
 
+#endif

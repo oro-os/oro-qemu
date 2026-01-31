@@ -15,12 +15,59 @@
 #include "hw/core/qdev-clock.h"
 #include "hw/core/qdev-properties.h"
 #include "hw/core/qdev-properties-system.h"
+#include "hw/core/cpu.h"
 #include "migration/vmstate.h"
 #include "chardev/char-fe.h"
 #include "chardev/char-serial.h"
 #include "qemu/log.h"
 #include "qemu/module.h"
 #include "trace.h"
+
+#define ORO_KDBG_NO_THREAD_ID 0xFF
+
+/*
+ * Encode and send an oro_kdbg event packet
+ * 
+ * @is_qemu_event: true if QEMU-generated event, false if kernel event
+ * @cpu_index: CPU core index (0-254) or ORO_KDBG_NO_THREAD_ID
+ * @command_id: 48-bit command ID (bits 47-0)
+ * @regs: Array of 7 register values
+ * @chr: Character frontend to send to
+ */
+void oro_kdbg_send_event(bool is_qemu_event, uint8_t cpu_index, 
+                         uint64_t command_id, const uint64_t regs[7],
+                         CharFrontend *chr)
+{
+    uint64_t packet[8];
+    uint8_t reg_count = 0;
+    
+    /* Validate command_id doesn't have top 16 bits set */
+    assert((command_id & 0xFFFF000000000000ULL) == 0);
+    
+    /* Build register bitmask (which of regs[1-7] are non-zero) */
+    uint8_t bitmask = 0;
+    reg_count = 1; /* reg[0] always sent */
+    for (int i = 0; i < 7; i++) {
+        if (regs[i] != 0) {
+            bitmask |= (1 << i);
+            packet[reg_count++] = regs[i];
+        }
+    }
+    
+    /* Encode reg[0]:
+     * - Bit 63: is_qemu_event
+     * - Bits 62-56: register bitmask
+     * - Bits 55-48: cpu_index
+     * - Bits 47-0: command_id
+     */
+    packet[0] = command_id | 
+                ((uint64_t)cpu_index << 48) |
+                ((uint64_t)bitmask << 56) |
+                ((uint64_t)is_qemu_event << 63);
+    
+    /* Send packet */
+    qemu_chr_fe_write_all(chr, (const uint8_t *)packet, reg_count * sizeof(uint64_t));
+}
 
 DeviceState *oro_kdbg_create(hwaddr addr, Chardev *chr)
 {
@@ -63,9 +110,40 @@ static void oro_kdbg_write(void *opaque, hwaddr offset,
 
     s->regs[reg_index] = value;
 
-    /* When first register is written, send all 8 registers (64 bytes) to chardev */
+    /* When first register is written, validate and send packet */
     if (reg_index == 0) {
-        qemu_chr_fe_write_all(&s->chr, (const uint8_t *)s->regs, sizeof(s->regs));
+        /* Validate kernel didn't set reserved bits (63-48) */
+        if (value & (1ULL << 63)) {
+            qemu_log_mask(LOG_GUEST_ERROR,
+                          "oro_kdbg: Kernel attempted to send QEMU event (bit 63 set)\n");
+            return;
+        }
+        if (value & (0x7FULL << 56)) {
+            qemu_log_mask(LOG_GUEST_ERROR,
+                          "oro_kdbg: Kernel attempted to manually set register bitmask (bits 62-56)\n");
+            return;
+        }
+        if (value & (0xFFULL << 48)) {
+            qemu_log_mask(LOG_GUEST_ERROR,
+                          "oro_kdbg: Kernel attempted to manually set thread ID (bits 55-48)\n");
+            return;
+        }
+        
+        /* Get CPU index from current executing CPU */
+        uint8_t cpu_index = ORO_KDBG_NO_THREAD_ID;
+        if (current_cpu) {
+            uint32_t idx = current_cpu->cpu_index;
+            if (idx > 254) {
+                qemu_log_mask(LOG_GUEST_ERROR,
+                              "oro_kdbg: CPU index %u exceeds 254, skipping\n", idx);
+            } else {
+                cpu_index = (uint8_t)idx;
+
+                /* Send event as kernel event */
+                oro_kdbg_send_event(false, cpu_index, value, 
+                                    &s->regs[1], &s->chr);
+            }
+        }
     }
 }
 
