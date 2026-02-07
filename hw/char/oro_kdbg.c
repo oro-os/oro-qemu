@@ -22,6 +22,7 @@
 #include "qemu/log.h"
 #include "qemu/module.h"
 #include "qemu/lockable.h"
+#include "qemu/bswap.h"
 #include "trace.h"
 
 #define ORO_KDBG_NO_THREAD_ID 0xFF
@@ -81,6 +82,7 @@ void oro_kdbg_send_event(bool is_qemu_event, uint8_t cpu_index,
                          CharFrontend *chr)
 {
     uint64_t packet[8];
+    uint64_t packet_le[8];
     uint8_t reg_count = 0;
     
     /* Validate command_id doesn't have top 16 bits set */
@@ -107,8 +109,13 @@ void oro_kdbg_send_event(bool is_qemu_event, uint8_t cpu_index,
                 ((uint64_t)bitmask << 56) |
                 ((uint64_t)is_qemu_event << 63);
     
+    /* Convert to little-endian for wire format */
+    for (int i = 0; i < reg_count; i++) {
+        packet_le[i] = cpu_to_le64(packet[i]);
+    }
+    
     /* Send packet */
-    qemu_chr_fe_write_all(chr, (const uint8_t *)packet, reg_count * sizeof(uint64_t));
+    qemu_chr_fe_write_all(chr, (const uint8_t *)packet_le, reg_count * sizeof(uint64_t));
 }
 
 DeviceState *oro_kdbg_create(hwaddr addr, Chardev *chr)
