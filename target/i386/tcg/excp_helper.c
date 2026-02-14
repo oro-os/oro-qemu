@@ -103,8 +103,8 @@ void raise_interrupt2(CPUX86State *env, int intno,
         intno = check_exception(env, intno, &error_code, retaddr);
         
 #if !defined(CONFIG_USER_ONLY)
-        /* Emit oro_kdbg exception event and register dumps */
-        {
+        /* Emit oro_kdbg exception event and register dumps only for architectural exceptions */
+        if (intno >= 0 && intno <= 31) {
             uint64_t regs[7];
             int eflags = cpu_compute_eflags(env);
             
