@@ -23,7 +23,8 @@ jobs:
         (sudo apt -oAPT::Get::Update::SourceListWarnings=False update || true)
         sudo apt install -y \
           debhelper build-essential aptly expect libssl-dev \
-          libssl-dev:arm64 binutils-aarch64-linux-gnu ninja-build
+          libssl-dev:arm64 binutils-aarch64-linux-gnu ninja-build \
+          libglib2.0-dev
     - name: Build
       run: |
         ./configure
