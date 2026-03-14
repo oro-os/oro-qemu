@@ -16,18 +16,28 @@ jobs:
         sudo dpkg --add-architecture arm64
         cat <<EOF | sudo tee /etc/apt/sources.list.d/ports.list
         deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble main restricted universe multiverse
-        deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-updates main restricted universe multiverse
         deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-backports main restricted universe multiverse
-        deb [arch=arm64] http://security.ports.ubuntu.com/ubuntu-ports noble-security main restricted universe multiverse
         EOF
         (sudo apt -oAPT::Get::Update::SourceListWarnings=False update || true)
         sudo apt install -y \
           debhelper build-essential aptly expect libssl-dev \
           libssl-dev:arm64 binutils-aarch64-linux-gnu ninja-build \
           libglib2.0-dev
-    - name: Build
+    - name: Cache Build Artifacts
+      id: linux-cache-build 
+      uses: actions/cache@v4
+      with:
+        key: ${{ runner.os }}-build-${{ hashFiles('configure') }}
+        restore-keys: |
+          ${{ runner.os }}-build-
+        path: |
+          build/
+    - name: Configure
+      if: ${{ steps.linux-cache-build.outputs.cache-hit != 'true' }}
       run: |
         ./configure
+    - name: Build
+      run: |
         ninja -C build
   build-macos-arm64:
     runs-on: macos-latest
@@ -36,7 +46,19 @@ jobs:
     - name: Install dependencies
       run: |
         brew install ninja
-    - name: Build
+    - name: Cache Build Artifacts
+      id: mac-cache-build 
+      uses: actions/cache@v4
+      with:
+        key: ${{ runner.os }}-build-${{ hashFiles('configure') }}
+        restore-keys: |
+          ${{ runner.os }}-build-
+        path: |
+          build/
+    - name: Configure
+      if: ${{ steps.mac-cache-build.outputs.cache-hit != 'true' }}
       run: |
         ./configure
+    - name: Build
+      run: |
         ninja -C build
