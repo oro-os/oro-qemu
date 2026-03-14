@@ -1,0 +1,41 @@
+name: Build DEB
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build-linux-amd64:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install dependencies
+      run: |
+        echo 'deb [signed-by=/etc/apt/keyrings/aptly.asc] http://repo.aptly.info/release noble main' | sudo tee /etc/apt/sources.list.d/aptly.list
+        sudo wget -O /etc/apt/keyrings/aptly.asc https://www.aptly.info/pubkey.txt
+        sudo dpkg --add-architecture arm64
+        cat <<EOF | sudo tee /etc/apt/sources.list.d/ports.list
+        deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble main restricted universe multiverse
+        deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-updates main restricted universe multiverse
+        deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-backports main restricted universe multiverse
+        deb [arch=arm64] http://security.ports.ubuntu.com/ubuntu-ports noble-security main restricted universe multiverse
+        EOF
+        (sudo apt -oAPT::Get::Update::SourceListWarnings=False update || true)
+        sudo apt install -y \
+          debhelper build-essential aptly expect libssl-dev \
+          libssl-dev:arm64 binutils-aarch64-linux-gnu ninja-build
+    - name: Build
+      run: |
+        ./configure
+        ninja -C build
+  build-macos-arm64:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install dependencies
+      run: |
+        brew install ninja
+    - name: Build
+      run: |
+        ./configure
+        ninja -C build
