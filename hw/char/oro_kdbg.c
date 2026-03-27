@@ -207,6 +207,9 @@ static const MemoryRegionOps oro_kdbg_ops = {
     .endianness = DEVICE_LITTLE_ENDIAN,
     .impl.min_access_size = 8,
     .impl.max_access_size = 8,
+    .valid.min_access_size = 8,
+    .valid.max_access_size = 8,
+    .valid.unaligned = false,
 };
 
 static void oro_kdbg_reset(DeviceState *dev)
