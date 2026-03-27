@@ -128,21 +128,24 @@ jobs:
     steps:
     - uses: actions/checkout@v4   # master — for the formula template
 
-    - name: Install aptly + gpg
+    - name: Install aptly + gpg + expect
       run: |
         echo 'deb [signed-by=/etc/apt/keyrings/aptly.asc] http://repo.aptly.info/release noble main' | sudo tee /etc/apt/sources.list.d/aptly.list
         sudo wget -q -O /etc/apt/keyrings/aptly.asc https://www.aptly.info/pubkey.txt
         (sudo apt-get -oAPT::Get::Update::SourceListWarnings=False update || true)
-        sudo apt-get install -y aptly gpg gpg-agent
+        sudo apt-get install -y aptly gpg gpg-agent expect
 
     - name: Import GPG signing key
       env:
         GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
       run: |
-        echo "$GPG_PRIVATE_KEY" | gpg --batch --import
-        GPG_KEY_ID=$(gpg --list-secret-keys --with-colons | awk -F: '/^sec/{print $5}' | head -1)
-        echo "GPG_KEY_ID=${GPG_KEY_ID}" >> "$GITHUB_ENV"
-        gpg --armor --export "$GPG_KEY_ID" > orok-qemu.gpg.pub
+        mkdir -p ~/.gnupg && chmod 700 ~/.gnupg
+        echo "$GPG_PRIVATE_KEY" | gpg --import --batch --yes
+        KEYID=$(gpg --list-secret-keys --keyid-format LONG | grep sec | awk '{print $2}' | cut -d/ -f2)
+        # Trust the key unconditionally so aptly can sign without prompts
+        expect -c "spawn gpg --edit-key $KEYID trust quit; send \"5\ry\r\"; expect eof"
+        echo "GPG_KEY_ID=${KEYID}" >> "$GITHUB_ENV"
+        gpg --armor --export "$KEYID" > orok-qemu.gpg.pub
 
     - name: Download artifacts
       uses: actions/download-artifact@v4
@@ -153,24 +156,15 @@ jobs:
     - name: Build APT repository
       run: |
         DEB="${{ needs.build-linux-amd64.outputs.deb_name }}"
-        mkdir -p site/apt
-        mkdir -p ~/.aptly
-        cat > ~/.aptly/aptly.conf <<EOF
-        {
-          "rootDir": "${HOME}/.aptly",
-          "gpgProvider": "gpg",
-          "gpgDisableSign": false,
-          "gpgDisableVerify": false,
-          "architectures": ["amd64"]
-        }
-        EOF
         aptly repo create -distribution=stable -component=main orok-qemu
         aptly repo add orok-qemu "$DEB"
         aptly publish repo \
           -distribution=stable \
           -gpg-key="$GPG_KEY_ID" \
           -force-overwrite \
-          orok-qemu filesystem:site/apt:
+          orok-qemu /orok-qemu
+        mkdir -p site/apt
+        cp -r ~/.aptly/public/orok-qemu/. site/apt/
         cp orok-qemu.gpg.pub site/orok-qemu.gpg.pub
 
     - name: Copy bottle
