@@ -1,0 +1,22 @@
+#!/usr/bin/make -f
+# Debian rules for orok-qemu
+# We drive the build manually via scripts/package-deb.sh in CI;
+# this file exists to satisfy debhelper expectations.
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	# configure done externally
+
+override_dh_auto_build:
+	# build done externally
+
+override_dh_auto_install:
+	install -d debian/orok-qemu/usr/bin
+	install -m 0755 build/qemu-system-x86_64   debian/orok-qemu/usr/bin/orok-qemu-system-x86_64
+	install -m 0755 build/qemu-system-aarch64  debian/orok-qemu/usr/bin/orok-qemu-system-aarch64
+	install -m 0755 build/qemu-system-riscv64  debian/orok-qemu/usr/bin/orok-qemu-system-riscv64
+
+override_dh_auto_test:
+	# skip tests

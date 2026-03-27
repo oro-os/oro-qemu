@@ -1,0 +1,14 @@
+Source: orok-qemu
+Section: misc
+Priority: optional
+Maintainer: Josh Junon <junon@oro.sh>
+Build-Depends: debhelper-compat (= 13), ninja-build, libglib2.0-dev, libssl-dev
+Standards-Version: 4.6.0
+
+Package: orok-qemu
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Oro OS fork of QEMU
+ A patched fork of QEMU for Oro OS kernel development, providing
+ orok-qemu-system-x86_64, orok-qemu-system-aarch64, and
+ orok-qemu-system-riscv64.

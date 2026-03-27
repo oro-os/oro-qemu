@@ -1,0 +1,5 @@
+orok-qemu (10.2.50-orok-1) unstable; urgency=medium
+
+  * Initial packaging of Oro OS QEMU fork.
+
+ -- Josh Junon <junon@oro.sh>  Thu, 27 Mar 2026 00:00:00 +0000

@@ -1,64 +1,230 @@
-name: Build DEB
+name: Build & Publish
 on:
   push:
     branches:
       - master
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 jobs:
+  # ── Linux amd64: build + package .deb ──────────────────────────────────────
   build-linux-amd64:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      deb_name: ${{ steps.version.outputs.deb_name }}
     steps:
     - uses: actions/checkout@v4
+
+    - name: Resolve version
+      id: version
+      run: |
+        VER="$(cat VERSION)-orok"
+        DEB="orok-qemu_${VER}-1_amd64.deb"
+        echo "version=${VER}" >> "$GITHUB_OUTPUT"
+        echo "deb_name=${DEB}"  >> "$GITHUB_OUTPUT"
+
     - name: Install dependencies
       run: |
-        echo 'deb [signed-by=/etc/apt/keyrings/aptly.asc] http://repo.aptly.info/release noble main' | sudo tee /etc/apt/sources.list.d/aptly.list
-        sudo wget -O /etc/apt/keyrings/aptly.asc https://www.aptly.info/pubkey.txt
-        sudo dpkg --add-architecture arm64
-        cat <<EOF | sudo tee /etc/apt/sources.list.d/ports.list
-        deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble main restricted universe multiverse
-        deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-backports main restricted universe multiverse
-        EOF
-        (sudo apt -oAPT::Get::Update::SourceListWarnings=False update || true)
-        sudo apt install -y \
-          debhelper build-essential aptly expect libssl-dev \
-          libssl-dev:arm64 binutils-aarch64-linux-gnu ninja-build \
-          libglib2.0-dev
-    - name: Cache Build Artifacts
-      id: linux-cache-build 
+        (sudo apt-get -oAPT::Get::Update::SourceListWarnings=False update || true)
+        sudo apt-get install -y \
+          debhelper build-essential ninja-build \
+          libglib2.0-dev libssl-dev
+
+    - name: Cache build artifacts
+      id: linux-cache-build
       uses: actions/cache@v4
       with:
         key: ${{ runner.os }}-build-${{ hashFiles('configure') }}
         restore-keys: |
           ${{ runner.os }}-build-
-        path: |
-          build/
+        path: build/
+
     - name: Configure
-      if: ${{ steps.linux-cache-build.outputs.cache-hit != 'true' }}
-      run: |
-        ./configure
+      if: steps.linux-cache-build.outputs.cache-hit != 'true'
+      run: ./configure
+
     - name: Build
+      run: ninja -C build qemu-system-x86_64 qemu-system-aarch64 qemu-system-riscv64
+
+    - name: Build .deb
       run: |
-        ninja -C build
+        VER="${{ steps.version.outputs.version }}"
+        sed -i "1s/([^)]*)/($VER-1)/" debian/changelog
+        dpkg-buildpackage -us -uc -b
+        mv "../orok-qemu_${VER}-1_amd64.deb" "${{ steps.version.outputs.deb_name }}"
+
+    - name: Upload .deb artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: orok-qemu-deb-amd64
+        path: ${{ steps.version.outputs.deb_name }}
+        retention-days: 30
+
+  # ── macOS arm64: build + package bottle tarball ─────────────────────────────
   build-macos-arm64:
     runs-on: macos-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      bottle_filename: ${{ steps.bottle.outputs.filename }}
+      bottle_sha256: ${{ steps.bottle.outputs.sha256 }}
     steps:
     - uses: actions/checkout@v4
-    - name: Install dependencies
+
+    - name: Resolve version
+      id: version
       run: |
-        brew install ninja
-    - name: Cache Build Artifacts
-      id: mac-cache-build 
+        VER="$(cat VERSION)-orok"
+        echo "version=${VER}" >> "$GITHUB_OUTPUT"
+
+    - name: Install dependencies
+      run: brew install ninja pkg-config glib
+
+    - name: Cache build artifacts
+      id: mac-cache-build
       uses: actions/cache@v4
       with:
         key: ${{ runner.os }}-build-${{ hashFiles('configure') }}
         restore-keys: |
           ${{ runner.os }}-build-
-        path: |
-          build/
+        path: build/
+
     - name: Configure
-      if: ${{ steps.mac-cache-build.outputs.cache-hit != 'true' }}
-      run: |
-        ./configure
+      if: steps.mac-cache-build.outputs.cache-hit != 'true'
+      run: ./configure
+
     - name: Build
+      run: ninja -C build qemu-system-x86_64 qemu-system-aarch64 qemu-system-riscv64
+
+    - name: Create bottle tarball
+      id: bottle
       run: |
-        ninja -C build
+        VER="${{ steps.version.outputs.version }}"
+        # Homebrew bottle internal layout: formula/version/bin/...
+        mkdir -p "orok-qemu/${VER}/bin"
+        cp build/qemu-system-x86_64  "orok-qemu/${VER}/bin/orok-qemu-system-x86_64"
+        cp build/qemu-system-aarch64 "orok-qemu/${VER}/bin/orok-qemu-system-aarch64"
+        cp build/qemu-system-riscv64 "orok-qemu/${VER}/bin/orok-qemu-system-riscv64"
+        # Filename matches what Homebrew expects given root_url + formula name + version
+        FNAME="orok-qemu-${VER}.arm64_sequoia.bottle.tar.gz"
+        tar -czf "${FNAME}" orok-qemu/
+        echo "filename=${FNAME}" >> "$GITHUB_OUTPUT"
+        echo "sha256=$(shasum -a 256 "${FNAME}" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+    - name: Upload bottle artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: orok-qemu-bottle-arm64
+        path: ${{ steps.bottle.outputs.filename }}
+        retention-days: 30
+
+  # ── Publish everything to GitHub Pages ────────────────────────────────────
+  publish:
+    needs: [build-linux-amd64, build-macos-arm64]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4   # master — for the formula template
+
+    - name: Install aptly + gpg
+      run: |
+        echo 'deb [signed-by=/etc/apt/keyrings/aptly.asc] http://repo.aptly.info/release noble main' | sudo tee /etc/apt/sources.list.d/aptly.list
+        sudo wget -q -O /etc/apt/keyrings/aptly.asc https://www.aptly.info/pubkey.txt
+        (sudo apt-get -oAPT::Get::Update::SourceListWarnings=False update || true)
+        sudo apt-get install -y aptly gpg gpg-agent
+
+    - name: Import GPG signing key
+      env:
+        GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+      run: |
+        echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+        GPG_KEY_ID=$(gpg --list-secret-keys --with-colons | awk -F: '/^sec/{print $5}' | head -1)
+        echo "GPG_KEY_ID=${GPG_KEY_ID}" >> "$GITHUB_ENV"
+        gpg --armor --export "$GPG_KEY_ID" > orok-qemu.gpg.pub
+
+    - name: Download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        pattern: orok-qemu-*
+        merge-multiple: true
+
+    - name: Build APT repository
+      run: |
+        DEB="${{ needs.build-linux-amd64.outputs.deb_name }}"
+        mkdir -p site/apt
+        mkdir -p ~/.aptly
+        cat > ~/.aptly/aptly.conf <<EOF
+        {
+          "rootDir": "${HOME}/.aptly",
+          "gpgProvider": "gpg",
+          "gpgDisableSign": false,
+          "gpgDisableVerify": false,
+          "architectures": ["amd64"]
+        }
+        EOF
+        aptly repo create -distribution=stable -component=main orok-qemu
+        aptly repo add orok-qemu "$DEB"
+        aptly publish repo \
+          -distribution=stable \
+          -gpg-key="$GPG_KEY_ID" \
+          -force-overwrite \
+          orok-qemu filesystem:site/apt:
+        cp orok-qemu.gpg.pub site/orok-qemu.gpg.pub
+
+    - name: Copy bottle
+      run: |
+        mkdir -p site/bottles
+        cp "${{ needs.build-macos-arm64.outputs.bottle_filename }}" site/bottles/
+
+    - name: Generate Homebrew formula
+      run: |
+        VER="${{ needs.build-macos-arm64.outputs.version }}"
+        SHA="${{ needs.build-macos-arm64.outputs.bottle_sha256 }}"
+        FNAME="${{ needs.build-macos-arm64.outputs.bottle_filename }}"
+        OWNER="${{ github.repository_owner }}"
+        REPO="${{ github.event.repository.name }}"
+        ROOT_URL="https://${OWNER}.github.io/${REPO}/bottles"
+        mkdir -p site/Formula
+        # Render the template: substitute PLACEHOLDER_SHA and PLACEHOLDER_ROOT_URL
+        sed \
+          -e "s|PLACEHOLDER_ROOT_URL|${ROOT_URL}|g" \
+          -e "s|PLACEHOLDER_SHA|${SHA}|g" \
+          Formula/orok-qemu.rb > site/Formula/orok-qemu.rb
+
+    - name: Write index page
+      run: |
+        OWNER="${{ github.repository_owner }}"
+        REPO="${{ github.event.repository.name }}"
+        BASE="https://${OWNER}.github.io/${REPO}"
+        cat > site/index.html <<EOF
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"><title>orok-qemu</title></head>
+        <body>
+        <h1>orok-qemu</h1>
+        <h2>Debian/Ubuntu (APT)</h2>
+        <pre>
+        sudo install -dm 755 /etc/apt/keyrings
+        sudo wget -O /etc/apt/keyrings/orok-qemu.gpg.pub ${BASE}/orok-qemu.gpg.pub
+        echo "deb [signed-by=/etc/apt/keyrings/orok-qemu.gpg.pub] ${BASE}/apt stable main" \\
+          | sudo tee /etc/apt/sources.list.d/orok-qemu.list
+        sudo apt-get update
+        sudo apt-get install orok-qemu
+        </pre>
+        <h2>macOS (Homebrew)</h2>
+        <pre>
+        brew install ${BASE}/Formula/orok-qemu.rb
+        </pre>
+        </body>
+        </html>
+        EOF
+
+    - name: Deploy to gh-pages
+      uses: peaceiris/actions-gh-pages@v4
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: site
+        publish_branch: gh-pages
+        force_orphan: true
